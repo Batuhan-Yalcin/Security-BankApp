@@ -9,10 +9,10 @@ const axiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
-  }
+  },
+  timeout: 10000 
 });
 
-// Request interceptor: Her istekte token ekler
 axiosInstance.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('accessToken');
@@ -26,7 +26,7 @@ axiosInstance.interceptors.request.use(
   }
 );
 
-// Response interceptor: Token yenileme mantığı ve hata işleme
+
 axiosInstance.interceptors.response.use(
   (response) => {
     return response;
@@ -34,26 +34,27 @@ axiosInstance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     
-    // Token geçersizse ve daha önce token yenileme denenmemişse
+   
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
+      console.log("401 hatası yakalandı, token yenilemeye çalışılıyor...");
       
       try {
-        // Token yenileme isteği
+     
         const refreshToken = localStorage.getItem('refreshToken');
         if (!refreshToken) {
-          // Refresh token yoksa kullanıcı çıkış yapmalıdır
+
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           localStorage.removeItem('user');
           
-          // Giriş sayfasına yönlendir
+        
           window.location.href = '/login';
           return Promise.reject(error);
         }
         
-        // Token yenileme işlemi
-        const refreshResponse = await axios.post('http://localhost:8080/api/auth/refresh-token', 
+
+        const refreshResponse = await axios.post(`${API_URL}/auth/refresh-token`, 
           { refreshToken },
           {
             headers: {
@@ -65,6 +66,8 @@ axiosInstance.interceptors.response.use(
         if (refreshResponse.data.success && refreshResponse.data.data) {
           const { accessToken, refreshToken: newRefreshToken } = refreshResponse.data.data;
           
+          console.log("Token başarıyla yenilendi");
+          
           // Yeni tokenları kaydet
           localStorage.setItem('accessToken', accessToken);
           localStorage.setItem('refreshToken', newRefreshToken);
@@ -73,6 +76,7 @@ axiosInstance.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${accessToken}`;
           return axios(originalRequest);
         } else {
+          console.error("Token yenileme başarısız: Sunucu başarılı yanıt vermedi");
           // Token yenileme başarısız, kullanıcıyı çıkış yaptır
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
@@ -94,7 +98,7 @@ axiosInstance.interceptors.response.use(
       }
     }
     
-    // Diğer hatalar için hata mesajlarını iyileştir
+   
     if (error.response?.data?.message) {
       error.message = error.response.data.message;
     } else if (error.response?.status === 404) {

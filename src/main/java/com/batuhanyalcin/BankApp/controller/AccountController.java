@@ -1,10 +1,14 @@
 package com.batuhanyalcin.BankApp.controller;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.batuhanyalcin.BankApp.dto.AccountCreateRequest;
 import com.batuhanyalcin.BankApp.dto.AccountDTO;
 import com.batuhanyalcin.BankApp.dto.ApiResponse;
+import com.batuhanyalcin.BankApp.security.service.CustomerDetails;
 import com.batuhanyalcin.BankApp.security.service.SecurityService;
 import com.batuhanyalcin.BankApp.service.AccountService;
 
@@ -101,5 +106,36 @@ public class AccountController {
             @Parameter(description = "Hesap ID")
             @PathVariable Long id) {
         return ResponseEntity.ok(accountService.deleteAccount(id));
+    }
+    
+    @Operation(summary = "Toplam Bakiye Bilgisi", description = "Kullanıcının tüm hesaplarının toplam bakiye bilgisini döndürür")
+    @GetMapping("/balance")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getAccountBalance(
+            @AuthenticationPrincipal CustomerDetails currentUser) {
+        // Bu endpoint şu an için test amaçlı mock veri dönüyor
+        // Gerçek uygulamada kullanıcının hesaplarından alınacak
+        Map<String, Object> response = new HashMap<>();
+        List<Map<String, Object>> accounts = new ArrayList<>();
+        
+        Map<String, Object> account1 = new HashMap<>();
+        account1.put("id", 1);
+        account1.put("name", "Ana Hesap");
+        account1.put("balance", 28540.50);
+        account1.put("currency", "TL");
+        accounts.add(account1);
+        
+        Map<String, Object> account2 = new HashMap<>();
+        account2.put("id", 2);
+        account2.put("name", "Tasarruf Hesabı");
+        account2.put("balance", 14210.35);
+        account2.put("currency", "TL");
+        accounts.add(account2);
+        
+        response.put("total", 42750.85);
+        response.put("change", 2.4);
+        response.put("accounts", accounts);
+        
+        return ResponseEntity.ok(ApiResponse.success("Bakiye bilgisi başarıyla getirildi", response));
     }
 } 
