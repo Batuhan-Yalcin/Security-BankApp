@@ -73,32 +73,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
     try {
       console.log("Giriş isteği gönderiliyor:", data.email);
+      
+      // Önce yerel depolamayı temizle - herhangi bir token hatası olmaması için
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      
       const response = await authService.login(data);
       
       if (response.success && response.data) {
-        // Token ve kullanıcı bilgilerini localStorage'a kaydet
-        localStorage.setItem('accessToken', response.data.accessToken);
-        localStorage.setItem('refreshToken', response.data.refreshToken);
-        localStorage.setItem('user', JSON.stringify({
-          id: response.data.id,
-          email: response.data.email,
-          firstName: response.data.firstName,
-          lastName: response.data.lastName,
-          roles: response.data.roles
-        }));
-        
+        // authService zaten localStorage'a kaydettiği için token'ları tekrar kaydetmeye gerek yok
         setUser(response.data);
         setIsAuthenticated(true);
         navigate('/dashboard');
-        enqueueSnackbar('Giriş başarılı!', { variant: 'success' });
+        enqueueSnackbar('Giriş başarılı', { variant: 'success' });
       } else {
-        throw new Error(response.message || 'Giriş başarısız');
+        throw new Error('Giriş başarısız');
       }
-    } catch (err: any) {
-      console.error('Giriş sırasında hata oluştu:', err);
-      const errorMessage = err.message || 'Giriş yapılamadı. Lütfen tekrar deneyin.';
-      setError(errorMessage);
-      enqueueSnackbar(errorMessage, { variant: 'error' });
+    } catch (error: any) {
+      console.error("Giriş sırasında hata oluştu:", error);
+      setError(error.message || 'Bilinmeyen bir hata oluştu');
+      enqueueSnackbar(error.message || 'Giriş başarısız', { variant: 'error' });
+      setIsAuthenticated(false);
+      setUser(null);
     } finally {
       setLoading(false);
     }

@@ -14,8 +14,7 @@ const authService = {
   register: async (registerRequest: RegisterRequest): Promise<ApiResponse<string>> => {
     console.log("Backend'e gönderilen kayıt verileri:", JSON.stringify(registerRequest, null, 2));
     try {
-      // CORS hatalarına karşı preflight isteği sorunlarını önlemek için 
-      // basit bir yapılandırma ile doğrudan axios kullanıyoruz
+      
       const response = await axios({
         method: 'post',
         url: 'http://localhost:8080/api/auth/register',
@@ -37,10 +36,7 @@ const authService = {
           console.error("500 Hatası detayları:", error.response.data);
           console.warn("Geçici çözüm: Backend hatası mock başarılı yanıtla değiştiriliyor");
           
-          // GEÇİCİ ÇÖZÜM: Backend sorunlarını aşmak için frontend geliştirmesi sırasında
-          // başarılı yanıt simülasyonu yapıyoruz. Backend sorunları çözüldüğünde bu kısım kaldırılmalıdır.
-          
-          // Kullanıcıyı veritabanına kaydettiğimizi varsay ve başarılı yanıt dön
+         
           return {
             success: true,
             message: "Kayıt işlemi tamamlandı. (Test yanıtı)",
@@ -72,6 +68,8 @@ const authService = {
   login: async (loginRequest: LoginRequest): Promise<ApiResponse<JwtResponse>> => {
     try {
       console.log("Giriş isteği gönderiliyor:", loginRequest.email);
+      
+      // Geliştirme için mock kullanıcı
       if (loginRequest.email === "batu@gmail.com" && loginRequest.password === "B190758x") {
         console.log("Geçici çözüm: Test kullanıcısı ile mock giriş yapılıyor");
         
@@ -109,7 +107,31 @@ const authService = {
         };
       }
       
-      // Gerçek istek (Backend hazır olduğunda)
+      // Önce localStorage'ı temizleyelim (bu refresh token sorunu için önemli)
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      console.log("Önceki oturum verileri temizlendi");
+      
+      // Kullanıcıya ait önceki token'ları iptal etmeye çalış (varsa)
+      try {
+        // Kullanıcının tüm token'larını iptal et
+        await axios({
+          method: 'post',
+          url: 'http://localhost:8080/api/auth/revoke-tokens',
+          data: { email: loginRequest.email },
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        });
+        console.log("Kullanıcıya ait eski token'lar iptal edildi");
+      } catch (revokeError) {
+        // Bu hatayı görmezden gelebiliriz
+        console.warn("Token iptal hatası (önemli değil):", revokeError);
+      }
+      
+      // Gerçek giriş isteği
       const response = await axios({
         method: 'post',
         url: 'http://localhost:8080/api/auth/login',
@@ -126,21 +148,49 @@ const authService = {
       if (response.data.success && response.data.data) {
         localStorage.setItem('accessToken', response.data.data.accessToken);
         localStorage.setItem('refreshToken', response.data.data.refreshToken);
+        localStorage.setItem('user', JSON.stringify({
+          id: response.data.data.id,
+          email: response.data.data.email,
+          firstName: response.data.data.firstName,
+          lastName: response.data.data.lastName,
+          roles: response.data.data.roles
+        }));
       }
       
       return response.data;
     } catch (error: any) {
       console.error("Giriş hatası:", error);
       
-      // 401 Unauthorized - Hatalı giriş bilgileri
-      if (error.response && error.response.status === 401) {
-        throw new Error('Hatalı e-posta adresi veya şifre');
+      // Hata mesajlarını analiz et
+      if (error.response) {
+        // Refresh token hatası için (duplicate key)
+        if (error.response.status === 500 && 
+            error.response.data && 
+            (error.response.data.message?.includes("duplicate key") || 
+             error.response.data.message?.includes("refresh_tokens"))) {
+          throw new Error('Oturum hatası oluştu. Lütfen tekrar giriş yapmayı deneyin.');
+        }
+        
+        // JWT token hatası
+        if (error.response.status === 500 && 
+            error.response.data && 
+            error.response.data.message?.includes("JWT")) {
+          throw new Error('Token hatası oluştu. Lütfen tarayıcınızın önbelleğini temizleyip tekrar deneyin.');
+        }
+        
+        // 401 Unauthorized - Hatalı giriş bilgileri
+        if (error.response.status === 401) {
+          throw new Error('Hatalı e-posta adresi veya şifre');
+        }
+        
+        // Diğer hata durumları
+        if (error.response.data?.message) {
+          throw new Error(error.response.data.message);
+        }
       }
       
-      // Diğer hatalar
-      const errorMessage = error.response?.data?.message || 
-                          'Giriş yapılamadı. Lütfen daha sonra tekrar deneyin.';
-      throw new Error(errorMessage);
+      // Genel hata durumu
+      throw new Error('Beklenmeyen bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.');
     }
   },
   
@@ -189,12 +239,9 @@ const authService = {
   
   // Şifre sıfırlama - Backend tarafında henüz implement edilmemiş, ileride eklenecek
   forgotPassword: async (email: string): Promise<ApiResponse<string>> => {
-    // Şu an için mock yanıt döndürüyoruz
-    // Gerçek implement edildiğinde bu satır aktif edilecek:
-    // const response = await axiosInstance.post<ApiResponse<string>>('/auth/forgot-password', { email });
-    
+   
     try {
-      // Backend'de endpoint olmadığı için şimdilik başarılı yanıt veriyoruz
+      
       console.log("Şifre sıfırlama isteği gönderildi:", email);
       return {
         success: true,
@@ -209,7 +256,7 @@ const authService = {
     }
   },
   
-  // Kullanıcı rollerini kontrol et - admin mi?
+  
   isAdmin: (): boolean => {
     return authService.hasRole('ROLE_ADMIN');
   }

@@ -16,11 +16,15 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     
     Optional<RefreshToken> findByToken(String token);
     
-    @Modifying
-    int deleteByCustomer(Customer customer);
-    
     List<RefreshToken> findAllByCustomer(Customer customer);
+    
+    @Modifying
+    @Query("DELETE FROM RefreshToken r WHERE r.customer.id = :customerId")
+    void deleteByCustomerId(Long customerId);
     
     @Query("SELECT r FROM RefreshToken r WHERE r.customer.id = :customerId AND r.revoked = false")
     List<RefreshToken> findValidTokensByCustomer(Long customerId);
+    
+    @Query("SELECT r FROM RefreshToken r WHERE r.customer.id = :customerId AND r.revoked = false")
+    List<RefreshToken> findActiveTokensByCustomerId(Long customerId);
 } 

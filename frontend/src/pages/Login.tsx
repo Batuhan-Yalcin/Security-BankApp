@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import * as Yup from 'yup';
@@ -86,6 +86,19 @@ const Login: React.FC = () => {
   const theme = useTheme();
   const [showPassword, setShowPassword] = useState(false);
 
+  // Sayfa yüklendiğinde eski oturum verilerini temizle
+  useEffect(() => {
+    // JWT token hatalarını önlemek için localStorage'ı temizleme
+    const clearLocalStorage = () => {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      console.log('Önceki oturum bilgileri temizlendi');
+    };
+    
+    clearLocalStorage();
+  }, []);
+
   // Parola görünürlüğünü değiştir
   const handleClickShowPassword = () => {
     setShowPassword(!showPassword);
@@ -93,7 +106,12 @@ const Login: React.FC = () => {
 
   // Formun gönderilmesi
   const handleSubmit = async (values: { email: string; password: string }) => {
-    await login(values);
+    try {
+      await login(values);
+    } catch (error) {
+      console.error('Giriş hatası:', error);
+      // Hatanın AuthContext'te işlendiğini varsayıyoruz
+    }
   };
 
   // Animasyon varyantları

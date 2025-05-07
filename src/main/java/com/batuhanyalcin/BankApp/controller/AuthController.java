@@ -18,11 +18,13 @@ import com.batuhanyalcin.BankApp.dto.TokenRefreshRequest;
 import com.batuhanyalcin.BankApp.dto.TokenRefreshResponse;
 import com.batuhanyalcin.BankApp.security.service.AuthService;
 import com.batuhanyalcin.BankApp.security.service.CustomerDetails;
+import com.batuhanyalcin.BankApp.exception.BadRequestException;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -61,6 +63,16 @@ public class AuthController {
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ApiResponse<String>> logoutAll(@AuthenticationPrincipal CustomerDetails currentUser) {
         return ResponseEntity.ok(authService.logoutAll(currentUser.getId()));
+    }
+    
+    @Operation(summary = "Kullanıcıya Ait Tüm Tokenları İptal Et", description = "E-posta adresine göre kullanıcıya ait tüm refresh tokenları iptal eder")
+    @PostMapping("/revoke-tokens")
+    public ResponseEntity<ApiResponse<String>> revokeTokensByEmail(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        if (email == null || email.isEmpty()) {
+            throw new BadRequestException("E-posta adresi gereklidir");
+        }
+        return ResponseEntity.ok(authService.revokeTokensByEmail(email));
     }
     
     @Operation(summary = "Mevcut Kullanıcı", description = "Mevcut oturum açmış kullanıcının bilgilerini döner")

@@ -94,6 +94,15 @@ public class AuthService {
             
             String jwt = jwtService.generateToken(customerDetails);
             
+            // Giriş yapmadan önce mevcut tüm refresh token'ları iptal et
+            try {
+                refreshTokenService.revokeAllCustomerTokens(customerDetails.getId());
+            } catch (Exception e) {
+          
+                System.err.println("Token iptal hatası (önemli değil): " + e.getMessage());
+            }
+            
+            // Yeni refresh token oluştur
             RefreshToken refreshToken = refreshTokenService.createRefreshToken(customerDetails.getId());
             
             List<String> roles = customerDetails.getAuthorities().stream()
@@ -115,6 +124,18 @@ public class AuthService {
             
         } catch (BadCredentialsException e) {
             throw new UnauthorizedException("Geçersiz kullanıcı adı veya şifre");
+        } catch (Exception e) {
+            // Hata detaylarını log et
+            System.err.println("Login sırasında beklenmeyen hata: " + e.getMessage());
+            e.printStackTrace();
+            
+            // Nedenini kontrol et ve uygun mesaj döndür
+            if (e.getMessage() != null && e.getMessage().contains("duplicate key")) {
+                throw new BadRequestException("Oturum açma hatası: Token çakışması. Lütfen tekrar deneyiniz.");
+            }
+            
+            // Diğer hatalar için genel mesaj
+            throw new BadRequestException("Giriş sırasında beklenmeyen bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.");
         }
     }
     
@@ -155,6 +176,16 @@ public class AuthService {
         SecurityContextHolder.clearContext();
         
         return ApiResponse.success("Tüm oturumlar sonlandırıldı");
+    }
+    
+    @Transactional
+    public ApiResponse<String> revokeTokensByEmail(String email) {
+        Customer customer = customerRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Müşteri", "email", email));
+        
+        refreshTokenService.revokeAllCustomerTokens(customer.getId());
+        
+        return ApiResponse.success("Kullanıcıya ait tüm tokenlar iptal edildi");
     }
     
     public CustomerDetails getCurrentCustomer() {
