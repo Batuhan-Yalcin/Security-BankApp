@@ -46,49 +46,39 @@ public class AuthService {
     
     @Transactional
     public ApiResponse<String> register(RegisterRequest registerRequest) {
-        // E-posta kontrolü
-        if (customerRepository.existsByEmail(registerRequest.getEmail())) {
-            throw new DuplicateResourceException("Müşteri", "email", registerRequest.getEmail());
-        }
-        
-        // Yeni müşteri oluşturma
-        Customer customer = new Customer();
-        customer.setFirstName(registerRequest.getFirstName());
-        customer.setLastName(registerRequest.getLastName());
-        customer.setEmail(registerRequest.getEmail());
-        customer.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
-        customer.setPhoneNumber(registerRequest.getPhoneNumber());
-        customer.setAddress(registerRequest.getAddress());
-        
-        // Roller atama
-        Set<String> strRoles = registerRequest.getRoles();
-        Set<Role> roles = new HashSet<>();
-        
-        if (strRoles == null || strRoles.isEmpty()) {
+        try {
+            // E-posta kontrolü
+            if (customerRepository.existsByEmail(registerRequest.getEmail())) {
+                throw new DuplicateResourceException("Müşteri", "email", registerRequest.getEmail());
+            }
+            
+            // Önce USER rolünü veritabanından al
             Role userRole = roleRepository.findByName(Role.RoleType.ROLE_USER)
                     .orElseThrow(() -> new ResourceNotFoundException("Rol", "name", "ROLE_USER"));
+            
+            // Yeni müşteri oluşturma
+            Customer customer = new Customer();
+            customer.setFirstName(registerRequest.getFirstName());
+            customer.setLastName(registerRequest.getLastName());
+            customer.setEmail(registerRequest.getEmail());
+            customer.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
+            customer.setPhoneNumber(registerRequest.getPhoneNumber());
+            customer.setAddress(registerRequest.getAddress());
+            
+            // Yeni müşteri için HashSet oluştur
+            Set<Role> roles = new HashSet<>();
             roles.add(userRole);
-        } else {
-            strRoles.forEach(role -> {
-                switch (role.toUpperCase()) {
-                    case "ADMIN":
-                        Role adminRole = roleRepository.findByName(Role.RoleType.ROLE_ADMIN)
-                                .orElseThrow(() -> new ResourceNotFoundException("Rol", "name", "ROLE_ADMIN"));
-                        roles.add(adminRole);
-                        break;
-                    case "USER":
-                    default:
-                        Role userRole = roleRepository.findByName(Role.RoleType.ROLE_USER)
-                                .orElseThrow(() -> new ResourceNotFoundException("Rol", "name", "ROLE_USER"));
-                        roles.add(userRole);
-                }
-            });
+            customer.setRoles(roles);
+            
+            // Kaydedip sonucu döndür
+            customerRepository.save(customer);
+            
+            return ApiResponse.success("Kullanıcı başarıyla kaydedildi");
+        } catch (Exception e) {
+            // Tüm hataları yakala ve loglama yap
+            e.printStackTrace();
+            throw e;
         }
-        
-        customer.setRoles(roles);
-        customerRepository.save(customer);
-        
-        return ApiResponse.success("Kullanıcı başarıyla kaydedildi");
     }
     
     @Transactional
